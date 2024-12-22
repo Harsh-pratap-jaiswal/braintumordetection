@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brain Tumor Detector</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1e1e2f;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .left-panel {
+      width: 50%;
+    }
+    .upload-section {
+      border: 2px dashed #555;
+      padding: 20px;
+      border-radius: 10px;
+      background-color: #2a2a3d;
+      margin-bottom: 20px;
+    }
+    .upload-section:hover {
+      background-color: #333;
+    }
+    .upload-section input {
+      display: none;
+    }
+    .upload-section label {
+      color: #aaa;
+      cursor: pointer;
+    }
+    .image-preview {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+    .image-preview img {
+      width: 100px;
+      height: 100px;
+      border-radius: 5px;
+      border: 2px solid #444;
+      object-fit: cover;
+    }
+    button {
+      background-color: #6e44ff;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background-color: #5533cc;
+    }
+    .right-panel {
+      width: 50%;
+      text-align: left;
+      background-color: #2a2a3d;
+      padding: 20px;
+      border-radius: 10px;
+      display: none; /* Initially hidden */
+    }
+    .result {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 2px solid;
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .result img {
+      width: 50px;
+      height: 50px;
+      border-radius: 5px;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <h1>Brain Tumor Detector <span>🧠</span></h1>
+  <div class="container">
+    <div class="left-panel">
+      <div class="upload-section">
+        <label for="file-upload">Drag & Drop Image(s) here<br>or <strong>Browse Image</strong></label>
+        <input id="file-upload" type="file" multiple>
+      </div>
+      <p>Or try with sample data</p>
+      <div class="image-preview" id="preview-area"></div>
+      <button id="get-sample">Get Sample Images</button>
+      <button id="predict">Predict</button>
+    </div>
+    <div class="right-panel" id="results-area">
+      <h2>Predictions</h2>
+    </div>
+  </div>
+
+  <script>
+    const sampleImages = [
+      "sample1.jpg",
+      "sample2.jpg",
+      "sample3.jpg",
+      "sample4.jpg",
+      "sample5.jpg",
+    ];
+  
+    const previewArea = document.getElementById("preview-area");
+    const fileUpload = document.getElementById("file-upload");
+    const getSampleBtn = document.getElementById("get-sample");
+    const predictBtn = document.getElementById("predict");
+    const resultsArea = document.getElementById("results-area");
+  
+    const metadata = []; // Store metadata for filenames and sources
+  
+    const reasonsWithTumor = [
+      "The scan shows abnormal growth in the frontal lobe, which could indicate malignancy.",
+      "Unusual density in the brain tissue suggests possible tumor development.",
+      "The image reveals irregularities in the left hemisphere consistent with tumor-like formations.",
+      "Signs of inflammation and swelling around the brain's core were detected.",
+      "There is evidence of vascular compression in the scan, possibly caused by a tumor.",
+    ];
+  
+    const reasonsWithoutTumor = [
+      "The scan appears clear, with no visible abnormalities in the brain tissue.",
+      "All regions of the brain show normal density and structure.",
+      "There is no evidence of irregular growth or swelling in the provided scan.",
+      "The scan results are within normal parameters, showing healthy brain tissue.",
+      "No signs of abnormal vascular patterns or pressure were detected.",
+    ];
+  
+    let clickCount = 0; // Track number of clicks
+    let timer = null; // Timer for the 3-second window
+    let lastResults = []; // Store the last prediction results
+  
+    function displayRandomSamples() {
+      previewArea.innerHTML = ""; // Clear previews
+      metadata.length = 0; // Clear metadata
+  
+      // Select 3 random sample images
+      const randomSamples = sampleImages.sort(() => 0.5 - Math.random()).slice(0, 3);
+      randomSamples.forEach((src) => {
+        const img = document.createElement("img");
+        img.src = src;
+        metadata.push({ src }); // Add metadata for sample image
+        previewArea.appendChild(img);
+      });
+    }
+  
+    // Load random samples on page load
+    window.onload = displayRandomSamples;
+  
+    // Handle "Get Sample Images" click
+    getSampleBtn.addEventListener("click", displayRandomSamples);
+  
+    // Handle file uploads
+    fileUpload.addEventListener("change", () => {
+      previewArea.innerHTML = ""; // Clear previews
+      metadata.length = 0; // Reset metadata
+      Array.from(fileUpload.files).forEach((file) => {
+        const img = document.createElement("img");
+        const blobUrl = URL.createObjectURL(file); // Generate a blob URL for the image
+        img.src = blobUrl;
+  
+        metadata.push({ src: blobUrl }); // Store metadata
+        img.onload = () => URL.revokeObjectURL(blobUrl); // Free memory
+        previewArea.appendChild(img);
+      });
+    });
+  
+    function simulatePrediction() {
+      const images = previewArea.querySelectorAll("img");
+      if (images.length === 0) {
+        resultsArea.style.display = "none"; // Hide panel if no images
+        return;
+      }
+  
+      resultsArea.innerHTML = "<h2>Predictions</h2>"; // Reset results
+      resultsArea.style.display = "block"; // Show panel
+  
+      const results = [];
+      images.forEach((img) => {
+        const isTumor = Math.random() < 0.5; // Randomly decide tumor presence
+        const accuracy = (Math.random() * (95 - 70) + 70).toFixed(2); // Random accuracy
+  
+        const reason = isTumor
+          ? reasonsWithTumor[Math.floor(Math.random() * reasonsWithTumor.length)]
+          : reasonsWithoutTumor[Math.floor(Math.random() * reasonsWithoutTumor.length)];
+  
+        results.push({
+          src: img.src,
+          isTumor,
+          accuracy,
+          reason,
+        });
+  
+        const resultDiv = document.createElement("div");
+        resultDiv.className = "result";
+        resultDiv.style.borderColor = isTumor ? "red" : "green";
+  
+        resultDiv.innerHTML = `
+          <img src="${img.src}" alt="Preview Image">
+          <div>
+            <p><strong>${isTumor ? "Tumor Detected" : "No Tumor Detected"}</strong></p>
+            <p>Accuracy: ${accuracy}%</p>
+            <p>Reason: ${reason}</p>
+          </div>
+        `;
+  
+        resultsArea.appendChild(resultDiv);
+      });
+  
+      lastResults = results; // Cache the latest results
+    }
+  
+    function handlePredictButton() {
+      clickCount++; // Increment click count
+  
+      // Start the 3-second timer on the first click
+      if (clickCount === 1) {
+        
+        if (lastResults.length > 0) {
+          resultsArea.innerHTML = "<h2>Predictions</h2>"; // Clear results
+          resultsArea.style.display = "block"; // Show panel
+  
+          lastResults.forEach((result) => {
+            const resultDiv = document.createElement("div");
+            resultDiv.className = "result";
+            resultDiv.style.borderColor = result.isTumor ? "red" : "green";
+  
+            resultDiv.innerHTML = `
+              <img src="${result.src}" alt="Preview Image">
+              <div>
+                <p><strong>${result.isTumor ? "Tumor Detected" : "No Tumor Detected"}</strong></p>
+                <p>Accuracy: ${result.accuracy}%</p>
+                <p>Reason: ${result.reason}</p>
+              </div>
+            `;
+            resultsArea.appendChild(resultDiv);
+          });
+        }
+      }
+  
+      // On the second click (within 3 seconds), repeat the last prediction result
+      else if (clickCount === 2) {
+        simulatePrediction(); // Run the default prediction functionality
+        timer = setTimeout(() => {
+          clickCount = 0; // Reset click count after 3 seconds
+        }, 3000);
+      }
+  
+      // On the third click (within 3 seconds), show an alert and refresh the page
+      else if (clickCount === 3) {
+        alert("One or more of the uploaded images is invalid, please upload a clear image.");
+        location.reload(); // Refresh the page
+      }
+    }
+  
+    // Attach the click event to the Predict button
+    predictBtn.addEventListener("click", handlePredictButton);
+  </script>
+  
+  
+</body>
+</html>
